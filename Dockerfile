@@ -19,8 +19,11 @@ COPY --chown=user . $HOME/app
 # Install our own src-layout package (monzo_ai) itself -- requirements.txt
 # only covers third-party deps, so without this the app can't import its
 # own modules. --no-deps because requirements.txt already pinned everything
-# this needs.
-RUN pip install --no-cache-dir --no-deps .
+# this needs. Must be editable (-e): discover_urls.py's REPO_ROOT is computed
+# by walking up from __file__, so a non-editable install (which copies the
+# package into site-packages) breaks that path resolution and, with it,
+# every default config/data path in the app.
+RUN pip install --no-cache-dir --no-deps -e .
 
 EXPOSE 8501
 
