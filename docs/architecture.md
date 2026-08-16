@@ -44,14 +44,14 @@ The user-facing job: answer a question about Monzo's products, fees, or features
 ### Analytics path
 
 ```text
-User queries → event logging → dbt → product analytics → customer intent / content-gap insights
+User queries → event logging → product analytics → customer intent / content-gap insights
 ```
 
-The product/business-facing job: every question asked, every retrieval that succeeds or comes up empty, is a signal. Logged as structured events, transformed with dbt, this becomes a dataset that answers questions a support team or product manager would actually care about — what are people trying to find out, where does the content fail to answer them, which topics cluster together, how does intent shift over time.
+The product/business-facing job: every question asked, every retrieval that succeeds or comes up empty, is a signal. Logged as structured events, this becomes a dataset that answers questions a support team or product manager would actually care about — what are people trying to find out, where does the content fail to answer them, which topics cluster together, how does intent shift over time.
 
 ### Why this matters
 
-Most public RAG demos stop at "ask a question, get an answer." Treating the query stream itself as a first-class analytics dataset — with a dbt layer, defined grain, and downstream dashboards — is what turns this from a chatbot demo into a product analytics portfolio piece. It's the same reason a real company would build something like this: not just to answer customers, but to learn what they're asking.
+Most public RAG demos stop at "ask a question, get an answer." Treating the query stream itself as a first-class analytics dataset — with a defined grain and downstream dashboards — is what turns this from a chatbot demo into a product analytics portfolio piece. It's the same reason a real company would build something like this: not just to answer customers, but to learn what they're asking.
 
 ## Phase 1–5 scope
 

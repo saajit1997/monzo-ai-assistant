@@ -51,10 +51,10 @@ Each phase is scoped to be buildable over a weekend. See `docs/architecture.md` 
 
 ## Phase 6 — Query/event analytics
 
-- **Objective**: Log every query + retrieval outcome as a structured event; model it with dbt.
-- **Outputs**: Event schema, dbt models under `dbt/`, populated `data/analytics/`.
+- **Objective**: Log every query + retrieval outcome as a structured event; model it into structured analytics tables.
+- **Outputs**: Event schema, analytics models, populated `data/analytics/`.
 - **Acceptance criteria**: Can answer "what are people asking about and where does retrieval fail" from the modelled data alone.
-- **Status**: event capture is already done — Phase 5 built the logging (`data/analytics/query_log.db`) in from the start rather than retrofitting it. What's left for this phase specifically is the dbt modelling layer on top of the raw event table.
+- **Status**: event capture is already done — Phase 5 built the logging (`data/analytics/query_log.db`) in from the start rather than retrofitting it. What's left for this phase specifically is the modelling layer on top of the raw event table.
 
 ## Phase 7 — Product analytics dashboard
 
