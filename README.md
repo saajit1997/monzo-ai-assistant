@@ -1,14 +1,3 @@
----
-title: Monzo AI Knowledge Assistant
-emoji: 💬
-colorFrom: red
-colorTo: gray
-sdk: docker
-app_port: 8501
-pinned: false
-license: mit
----
-
 # Monzo AI Knowledge Assistant
 
 **🔗 [Live demo](https://huggingface.co/spaces/saajit1997/monzo-ai-assistant)** — capped at 10 questions per session to bound API cost.
