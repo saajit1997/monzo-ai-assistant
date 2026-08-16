@@ -14,6 +14,7 @@ calls) and needs your own key. The retrieval-only test tool
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import streamlit as st
@@ -98,7 +99,13 @@ assistant_cfg = config.get("assistant", {})
 model = assistant_cfg.get("model", "claude-haiku-4-5")
 max_tokens = assistant_cfg.get("max_tokens", 1024)
 max_queries_per_session = assistant_cfg.get("max_queries_per_session", 10)
-db_path = Path(config.get("analytics", {}).get("query_log_path", "data/analytics/query_log.db"))
+# ANALYTICS_DB_PATH overrides config in the deployed Space, pointing the
+# db at the mounted persistent Storage Bucket instead of container-local
+# disk (which HF wipes on every restart).
+db_path = Path(
+    os.environ.get("ANALYTICS_DB_PATH")
+    or config.get("analytics", {}).get("query_log_path", "data/analytics/query_log.db")
+)
 
 if "messages" not in st.session_state:
     st.session_state.messages = []

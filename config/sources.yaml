@@ -46,6 +46,12 @@ assistant:
   max_queries_per_session: 10
 
 analytics:
+  # Locally (and inside the Docker image if no bucket is mounted) this is a
+  # plain relative path under the repo. In the deployed Space, HF wipes
+  # container-local disk on every restart, so ANALYTICS_DB_PATH is set to a
+  # path on the mounted persistent Storage Bucket instead (see Dockerfile /
+  # Space secrets) -- query_log.py falls back to this value if that env var
+  # isn't set.
   query_log_path: "data/analytics/query_log.db"
 
 normalisation:
