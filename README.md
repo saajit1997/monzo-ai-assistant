@@ -11,6 +11,8 @@ license: mit
 
 # Monzo AI Knowledge Assistant
 
+**🔗 [Live demo](https://huggingface.co/spaces/saajit1997/monzo-ai-assistant)** — capped at 10 questions per session to bound API cost.
+
 > **Disclaimer:** This is an independent portfolio project and is not affiliated with, endorsed by, or sponsored by Monzo Bank.
 
 ## Problem
