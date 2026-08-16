@@ -16,6 +16,12 @@ ENV HOME=/home/user \
 WORKDIR $HOME/app
 COPY --chown=user . $HOME/app
 
+# Install our own src-layout package (monzo_ai) itself -- requirements.txt
+# only covers third-party deps, so without this the app can't import its
+# own modules. --no-deps because requirements.txt already pinned everything
+# this needs.
+RUN pip install --no-cache-dir --no-deps .
+
 EXPOSE 8501
 
 CMD ["streamlit", "run", "app/streamlit_app.py", \
