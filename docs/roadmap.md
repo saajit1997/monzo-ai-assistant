@@ -44,13 +44,15 @@ Each phase is scoped to be buildable over a weekend. See `docs/architecture.md` 
 - **Outputs**: Graph store populated under `src/monzo_ai/knowledge_graph/`.
 - **Acceptance criteria**: Can answer simple structured queries (e.g. "which accounts have no monthly fee") directly from the graph.
 
-## Phase 6 — Embeddings + hybrid retrieval (current)
+## Phase 6 — Embeddings + hybrid retrieval
 
 - **Objective**: Chunk and embed processed content; combine vector similarity with keyword/BM25 search.
-- **Outputs**: Vector store populated under `src/monzo_ai/retrieval/`.
+- **Outputs**: Vector store populated under `src/monzo_ai/retrieval/`, artifacts in `data/processed/retrieval/` (committed — small and, unlike Phase 3's output, regenerable from `pages.parquet` alone, but committed anyway for reviewer convenience).
 - **Acceptance criteria**: Given a sample query set, retrieval returns relevant chunks in the top-k with measured precision.
+- **Approach**: chunks are packed from Phase 3's existing line-per-paragraph/line-per-table-row text up to ~220 words, splitting only at line boundaries (never mid-sentence, and — since Phase 3 already made every table row self-contained — never separating a value from its label). Embeddings are computed once with a local `sentence-transformers` model (`all-MiniLM-L6-v2`, no API key, no per-query cost, fully reproducible offline) into a FAISS flat index; BM25 (`rank_bm25`) supplies the keyword half. The two rankings are combined via Reciprocal Rank Fusion rather than a learned re-ranker, kept deliberately simple for the MVP.
+- **Status**: done. Live build: 909 pages → 1,774 chunks, ~3MB index, ~30s to build locally. `scripts/evaluate_retrieval.py` runs a hand-written 14-query set (spanning help/product/business/security/legal) against the real index: **13/14 (93%) hit-rate@5**. The one miss ("how much does Monzo Max cost per month") pulled several on-topic-but-wrong pages (T&Cs, fee-information) instead of the actual plan-comparison page — a plausible limitation of a small local embedding model on a comparison-style query, not a code bug; noted rather than chased further for MVP scope.
 
-## Phase 7 — RAG assistant
+## Phase 7 — RAG assistant (current)
 
 - **Objective**: Wire retrieval into an LLM-backed conversational assistant. (Originally also planned to draw on Phase 5's knowledge graph — deferred with Phase 5; retrieval-only is enough to prove the concept for the MVP.)
 - **Outputs**: `app/` FastAPI service exposing a chat endpoint.

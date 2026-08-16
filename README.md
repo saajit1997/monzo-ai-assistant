@@ -22,9 +22,9 @@ Full detail, including the deliberate split between the operational (answer-a-qu
 
 ## Current phase
 
-**Phase 6 — Embeddings + hybrid retrieval.** Phases 1–3 built the content pipeline: sitemap → URL inventory (`data/raw/monzo_urls.csv`) → raw HTML (`data/raw/pages/`, manifest at `data/raw/pages_manifest.csv`) → clean structured text (`data/processed/pages.parquet`). Phases 4 (dbt over static content) and 5 (knowledge graph) are deferred — see the MVP scope note in `docs/roadmap.md` — in favour of going straight to retrieval, since that's the shortest path to a working, demonstrable assistant.
+**Phase 7 — RAG assistant (next).** Phases 1–3 built the content pipeline: sitemap → URL inventory (`data/raw/monzo_urls.csv`) → raw HTML (`data/raw/pages/`, manifest at `data/raw/pages_manifest.csv`) → clean structured text (`data/processed/pages.parquet`). Phase 6 chunks that text (~2 pages → 1 chunk, ~220 words each) and builds a hybrid retrieval index — local sentence-transformers embeddings in FAISS, fused with BM25 keyword search via Reciprocal Rank Fusion — under `data/processed/retrieval/`. A hand-written 14-query acceptance eval hits the correct page in the top-5 for 13/14 (93%). Phases 4 (dbt over static content) and 5 (knowledge graph) are deferred — see the MVP scope note in `docs/roadmap.md`.
 
-No chatbot, RAG, or embeddings exist yet.
+Retrieval works; there's no LLM-backed chat yet — `scripts/query_monzo_assistant.py` shows retrieved chunks, not a generated answer.
 
 ## Future phases
 
@@ -35,8 +35,8 @@ No chatbot, RAG, or embeddings exist yet.
 | 3 | Content cleaning and modelling |
 | 4 | dbt analytics layer *(deferred, not required for MVP)* |
 | 5 | Knowledge graph *(deferred, not required for MVP)* |
-| 6 | Embeddings + hybrid retrieval *(current)* |
-| 7 | RAG assistant |
+| 6 | Embeddings + hybrid retrieval |
+| 7 | RAG assistant *(current)* |
 | 8 | Query/event analytics |
 | 9 | Product analytics dashboard |
 | 10 | Evaluation and observability |
@@ -49,6 +49,7 @@ See [`docs/roadmap.md`](docs/roadmap.md) for objectives/outputs/acceptance crite
 - `data/raw/pages_manifest.csv` **is committed to git.** Same reasoning as above — one small, useful row per fetched URL (status code, content hash, timestamp), not the content itself.
 - `data/raw/pages/*.html` (the actual scraped HTML bodies) is **not committed** — regenerable by re-running `scripts/fetch_monzo_pages.py`, and bulky enough (~1k files, ~100MB) that it doesn't belong in git history.
 - `data/processed/pages.parquet` **is committed to git.** It's small (~1MB) and, unlike the raw HTML, isn't regenerable from anything else in the repo — it's built from the gitignored `data/raw/pages/*.html`, so without committing it a reviewer would have to run the full live crawl themselves just to see Phase 3's output.
+- `data/processed/retrieval/` (Phase 6's FAISS index + chunk table) **is committed to git.** Small (~3MB) and, unlike Phase 3's output, *is* regenerable from something already committed (`pages.parquet`) — committed anyway so reviewers can query the assistant's retrieval step immediately instead of waiting ~30s for a local embedding build.
 - The rest of `data/processed/` and all of `data/analytics/` are **not committed** (`.gitignore`'d, `.gitkeep` aside). Future phases may generate much larger derived content there that doesn't belong in git history.
 
 ## Installation
@@ -100,6 +101,20 @@ Optional flags:
 
 - `--limit N` — cap the number of pages cleaned, for fast local iteration.
 - `--manifest / --urls / --output PATH` — override the default paths.
+
+## Running Phase 6
+
+```bash
+python scripts/build_retrieval_index.py
+python scripts/query_monzo_assistant.py "what's the fee for withdrawing cash abroad"
+python scripts/evaluate_retrieval.py
+```
+
+`build_retrieval_index.py` chunks `data/processed/pages.parquet` (~220 words/chunk, packed along existing line boundaries so a table row is never split from its own label), embeds every chunk locally with `sentence-transformers` (`all-MiniLM-L6-v2`, no API key), and saves a FAISS index + chunk table to `data/processed/retrieval/`.
+
+`query_monzo_assistant.py` runs a hybrid search (vector similarity + BM25 keyword, fused with Reciprocal Rank Fusion) and prints the top-k retrieved chunks — no LLM call, just what a RAG assistant would see as context.
+
+`evaluate_retrieval.py` runs a hand-written 14-question query set with expected-relevant pages against the built index and reports hit-rate@5 (currently 13/14, 93%).
 
 ## Responsible crawling
 

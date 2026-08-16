@@ -26,6 +26,12 @@ data/analytics/*
 # can see Phase 3's actual output without running the full live crawl.
 !data/processed/pages.parquet
 
+# Phase 6's retrieval index (~3MB) is likewise small and, unlike raw HTML,
+# lets reviewers query the assistant's retrieval step immediately instead of
+# waiting for the local embedding build — commit it too.
+!data/processed/retrieval/
+!data/processed/retrieval/*
+
 # Phase 2: raw HTML dumps are bulky derived content, regenerable by
 # re-running scripts/fetch_monzo_pages.py — only the small manifest CSV
 # (data/raw/pages_manifest.csv) documenting the run is committed.

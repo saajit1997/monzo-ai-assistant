@@ -32,6 +32,14 @@ content_clean:
   urls_path: "data/raw/monzo_urls.csv"
   output_path: "data/processed/pages.parquet"
 
+retrieval:
+  pages_path: "data/processed/pages.parquet"
+  index_dir: "data/processed/retrieval"
+  model_name: "all-MiniLM-L6-v2"
+  chunk_target_words: 220
+  chunk_min_words: 40
+  chunk_overlap_lines: 1
+
 normalisation:
   strip_query_params:
     - "utm_source"
