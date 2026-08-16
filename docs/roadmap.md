@@ -11,18 +11,22 @@ Each phase is scoped to be buildable over a weekend. See `docs/architecture.md` 
 - **Acceptance criteria**: `python scripts/discover_monzo_urls.py` runs against the live site with zero manual URL entry; output is normalised, deduplicated, categorised, and MVP-flagged from config-driven rules; `pytest` passes with zero live network calls.
 - **Status**: done. Live run against monzo.com: 2,512 URLs discovered, 943 flagged `include_in_mvp`.
 
-## Phase 2 — Content ingestion (current)
+## Phase 2 — Content ingestion
 
 - **Objective**: Fetch the HTML for every `include_in_mvp=True` URL from Phase 1's inventory.
 - **Outputs**: Raw HTML per URL under `data/raw/pages/` (not committed — regenerable), with a fetch manifest (`data/raw/pages_manifest.csv`: status code, fetched_at, content hash, error) for idempotent re-runs.
 - **Acceptance criteria**: Reuses the same `httpx.Client` + rate-limiting pattern as Phase 1 (shared retry helper in `src/monzo_ai/utils/http.py`); additionally re-checks each URL against `robots.txt` via `RobotFileParser.can_fetch()` before fetching it (Phase 1 only reads sitemaps, never fetches individual pages, so this is the first point robots.txt Disallow rules matter for real page fetches); handles 4xx/5xx/timeouts without crashing the batch; re-running skips URLs with an already-successful manifest entry unless `--force` is passed.
 - **Note**: raw HTML only — no boilerplate stripping or text extraction. That's Phase 3.
+- **Status**: done. Live run against monzo.com: 943 targets, 909 fetched successfully, 34 failed (all clean HTTP 404s — a stale sitemap cluster under `/help/monzo-home-insurance/*` for a discontinued product, plus a handful of individually-stale help URLs; nothing on the pipeline side).
 
 ## Phase 3 — Content cleaning and modelling
 
 - **Objective**: Turn raw HTML into clean, structured text (title, body, headings, published date where available) using `beautifulsoup4`.
-- **Outputs**: `data/processed/pages.parquet` (or similar) with one row per page.
+- **Outputs**: `data/processed/pages.parquet` (committed — small and not regenerable from anything else in the repo, see README's data policy) with one row per page.
 - **Acceptance criteria**: Boilerplate (nav, footer, cookie banners) stripped; content is chunkable; schema validated with pydantic.
+- **Approach**: every Monzo page inspected has exactly one `<main>` tag holding the real content, with site nav/header/footer and the cookie-consent banner consistently living outside it — `<main>` (falling back to `<body>`, then the whole document) is used as the content root, with `<nav>/<header>/<footer>`/script/style and any cookie/consent-marked elements additionally stripped from inside it defensively. `og:title`/`og:description` are preferred over the plain `<title>`/meta description tags, which are more consistently populated on this site.
+- **Status**: done. Live run: 909/909 fetched pages cleaned (0 failures after a bug fix — see below); median 213 words/page; 0 rows with detectable boilerplate leakage; `published_at` is null for all 909 pages (Monzo doesn't expose page dates in `<time>` tags or `article:*` meta on this site).
+- **Bug found and fixed during the live run**: the boilerplate-stripper decomposed cookie/consent-marked elements while iterating a pre-computed `find_all(True)` list; on `/legal/*` pages with *nested* cookie-marked elements (a wrapper div plus an inner marked child), decomposing the outer element invalidated the inner one's `.attrs` before the loop reached it, crashing on `'NoneType' object has no attribute 'get'` for 750/909 pages. The two hand-written test fixtures didn't have nested markers, so this only surfaced against real data. Fixed with a `tag.decomposed` guard; added a regression test with a nested cookie-marker fixture.
 
 ## Phase 4 — dbt analytics layer
 

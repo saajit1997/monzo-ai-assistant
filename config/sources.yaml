@@ -27,6 +27,11 @@ content_fetch:
   output_dir: "data/raw/pages"
   manifest_path: "data/raw/pages_manifest.csv"
 
+content_clean:
+  manifest_path: "data/raw/pages_manifest.csv"
+  urls_path: "data/raw/monzo_urls.csv"
+  output_path: "data/processed/pages.parquet"
+
 normalisation:
   strip_query_params:
     - "utm_source"

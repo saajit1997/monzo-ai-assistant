@@ -22,7 +22,7 @@ Full detail, including the deliberate split between the operational (answer-a-qu
 
 ## Current phase
 
-**Phase 2 — Content ingestion.** Phase 1 crawls Monzo's public sitemap(s) (via `robots.txt`), normalises and deduplicates the URLs, categorises them, and flags which ones belong in the MVP knowledge base (`data/raw/monzo_urls.csv`). Phase 2 fetches the raw HTML for every `include_in_mvp=True` URL, re-checking each one against `robots.txt` individually, and records a fetch manifest (`data/raw/pages_manifest.csv`: status code, content hash, fetch timestamp, error if any) so re-runs skip pages already fetched successfully instead of re-crawling the whole site.
+**Phase 3 — Content cleaning and modelling.** Phase 1 crawls Monzo's public sitemap(s) (via `robots.txt`), normalises and deduplicates the URLs, categorises them, and flags which ones belong in the MVP knowledge base (`data/raw/monzo_urls.csv`). Phase 2 fetches the raw HTML for every `include_in_mvp=True` URL, re-checking each one against `robots.txt` individually, and records a fetch manifest (`data/raw/pages_manifest.csv`: status code, content hash, fetch timestamp, error if any) so re-runs skip pages already fetched successfully instead of re-crawling the whole site. Phase 3 parses that raw HTML with BeautifulSoup into clean, structured text — title, headings, body text, word count — stripping nav/header/footer/cookie-banner boilerplate, and writes one row per page to `data/processed/pages.parquet`.
 
 No chatbot, RAG, embeddings, or knowledge graph exists yet.
 
@@ -31,8 +31,8 @@ No chatbot, RAG, embeddings, or knowledge graph exists yet.
 | Phase | Focus |
 |---|---|
 | 1 | URL discovery |
-| 2 | Content ingestion *(current)* |
-| 3 | Content cleaning and modelling |
+| 2 | Content ingestion |
+| 3 | Content cleaning and modelling *(current)* |
 | 4 | dbt analytics layer |
 | 5 | Knowledge graph |
 | 6 | Embeddings + hybrid retrieval |
@@ -47,8 +47,9 @@ See [`docs/roadmap.md`](docs/roadmap.md) for objectives/outputs/acceptance crite
 
 - `data/raw/monzo_urls.csv` **is committed to git.** It's a small (~1–2k row), useful artifact that documents Phase 1's output for reviewers — nothing sensitive, just public URLs and metadata derived from them.
 - `data/raw/pages_manifest.csv` **is committed to git.** Same reasoning as above — one small, useful row per fetched URL (status code, content hash, timestamp), not the content itself.
-- `data/raw/pages/*.html` (the actual scraped HTML bodies) is **not committed** — regenerable by re-running `scripts/fetch_monzo_pages.py`, and bulky enough (~1k files) that it doesn't belong in git history.
-- `data/processed/` and `data/analytics/` are **not committed** (`.gitignore`'d, `.gitkeep` aside). Future phases will generate much larger scraped/derived content there that doesn't belong in git history.
+- `data/raw/pages/*.html` (the actual scraped HTML bodies) is **not committed** — regenerable by re-running `scripts/fetch_monzo_pages.py`, and bulky enough (~1k files, ~100MB) that it doesn't belong in git history.
+- `data/processed/pages.parquet` **is committed to git.** It's small (~1MB) and, unlike the raw HTML, isn't regenerable from anything else in the repo — it's built from the gitignored `data/raw/pages/*.html`, so without committing it a reviewer would have to run the full live crawl themselves just to see Phase 3's output.
+- The rest of `data/processed/` and all of `data/analytics/` are **not committed** (`.gitignore`'d, `.gitkeep` aside). Future phases may generate much larger derived content there that doesn't belong in git history.
 
 ## Installation
 
@@ -86,6 +87,19 @@ Optional flags:
 - `--limit N` — cap the number of URLs fetched, for fast local iteration.
 - `--force` — re-fetch URLs even if already successfully cached.
 - `--input / --output-dir / --manifest PATH` — override the default paths.
+
+## Running Phase 3
+
+```bash
+python scripts/clean_monzo_content.py
+```
+
+Reads Phase 2's fetch manifest, parses each successfully-fetched HTML file with BeautifulSoup, strips nav/header/footer/cookie-banner boilerplate, and writes one row per page (title, headings, body text, word count, published date if available) to `data/processed/pages.parquet`.
+
+Optional flags:
+
+- `--limit N` — cap the number of pages cleaned, for fast local iteration.
+- `--manifest / --urls / --output PATH` — override the default paths.
 
 ## Responsible crawling
 

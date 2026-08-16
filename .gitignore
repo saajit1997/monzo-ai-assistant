@@ -14,11 +14,17 @@ dist/
 .mypy_cache/
 .ruff_cache/
 
-# Phase 2+ generated artifacts — not Phase 1's committed CSV
+# Phase 3+ generated artifacts — not Phase 1's committed CSV
 data/processed/*
 !data/processed/.gitkeep
 data/analytics/*
 !data/analytics/.gitkeep
+
+# Exception: Phase 3's cleaned-content table is small (~1MB) and, unlike raw
+# HTML, isn't regenerable from anything else committed to the repo (it's
+# built from the gitignored data/raw/pages/*.html) — commit it so reviewers
+# can see Phase 3's actual output without running the full live crawl.
+!data/processed/pages.parquet
 
 # Phase 2: raw HTML dumps are bulky derived content, regenerable by
 # re-running scripts/fetch_monzo_pages.py — only the small manifest CSV
