@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 from pydantic import BaseModel
 
 from monzo_ai.utils.logging import get_logger
@@ -97,6 +97,68 @@ def _extract_published_at(soup: BeautifulSoup, content_root) -> str | None:
     return None
 
 
+def _header_cell_text(cell) -> str:
+    """Some comparison-table headers are an SVG card icon with no visible
+    text at all — the real label only exists in the cell's aria-label (e.g.
+    <th aria-label="Monzo Free">). Prefer that when present.
+    """
+    aria_label = cell.get("aria-label")
+    if aria_label and aria_label.strip():
+        return aria_label.strip()
+    return cell.get_text(strip=True)
+
+
+def _table_to_text(table) -> str:
+    """Flattens a <table> into text that keeps each value attached to its row
+    and column label, instead of losing that association the way plain
+    get_text() would (row label, then bare values, in DOM order).
+
+    Every table found on monzo.com follows the same shape: a <thead> with one
+    header row (first cell is a blank corner cell), and <tbody> rows whose
+    first cell is the row label and remaining cells are the values for each
+    column header. Falls back to a plain " — "-joined line per row if a
+    row's cell count doesn't match the header count.
+
+    Some comparison tables additionally repeat the row label inside each
+    value cell for their mobile/card layout (e.g. a value cell's raw text
+    reads "Instant Access Savings Pot2.75% AER (variable)"); that repeated
+    prefix is stripped since the row label is already carried separately.
+    """
+    header_row = table.find("thead")
+    col_headers: list[str] = []
+    if header_row:
+        first_tr = header_row.find("tr")
+        if first_tr:
+            col_headers = [_header_cell_text(c) for c in first_tr.find_all(["th", "td"])]
+
+    body = table.find("tbody") or table
+    lines: list[str] = []
+    for tr in body.find_all("tr"):
+        cells = [c.get_text(strip=True) for c in tr.find_all(["th", "td"])]
+        if not cells:
+            continue
+        row_label, values = cells[0], cells[1:]
+        values = [v[len(row_label) :].strip() if row_label and v.startswith(row_label) else v for v in values]
+
+        if col_headers and len(col_headers) == len(cells):
+            pairs = [f"{header}: {value}" for header, value in zip(col_headers[1:], values) if header and value]
+            lines.append(f"{row_label} — {'; '.join(pairs)}" if pairs else row_label)
+        else:
+            lines.append(" — ".join([row_label, *values]))
+
+    return "\n".join(lines)
+
+
+def _flatten_tables(content_root) -> None:
+    """Replaces every <table> in content_root with its label-preserving text
+    form, in place, so it flows into get_text() at the right position.
+    """
+    for table in content_root.find_all("table"):
+        if table.decomposed:
+            continue
+        table.replace_with(NavigableString(f"\n{_table_to_text(table)}\n"))
+
+
 def extract_page_content(html: str, url: str) -> dict[str, Any]:
     """Parses raw HTML into a structured, boilerplate-stripped content dict.
 
@@ -127,6 +189,8 @@ def extract_page_content(html: str, url: str) -> dict[str, Any]:
             continue
         if _is_boilerplate_marked(tag):
             tag.decompose()
+
+    _flatten_tables(content_root)
 
     headings = [h.get_text(strip=True) for h in content_root.find_all(_HEADING_TAGS)]
     headings = [h for h in headings if h]

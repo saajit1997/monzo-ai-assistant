@@ -63,6 +63,46 @@ PAGE_WITH_TIME_TAG = """
 <p>Body text.</p></main></body></html>
 """
 
+# Mirrors the real structure found on monzo.com/help/.../understanding-fees:
+# <thead> with a blank corner cell, <tbody> rows of [row label, value...].
+PAGE_WITH_FEE_TABLE = """
+<html><head><title>Fees</title></head>
+<body><main>
+<h1>Understanding fees</h1>
+<table>
+<thead><tr><th></th><th>UK &amp; EEA</th><th>Outside EEA</th></tr></thead>
+<tbody>
+<tr><td>Monzo is not my main bank</td><td>400 fee-free</td><td>200 fee-free</td></tr>
+<tr><td>Monzo is my main bank</td><td>Unlimited fee-free</td><td>200 fee-free</td></tr>
+</tbody>
+</table>
+</main></body></html>
+"""
+
+# Mirrors the real structure found on monzo.com/savings-isas: SVG-icon-only
+# headers (real label only in aria-label) and value cells that repeat the
+# row label for their mobile card layout.
+PAGE_WITH_COMPARISON_TABLE = """
+<html><head><title>Savings</title></head>
+<body><main>
+<h1>Savings</h1>
+<table>
+<thead><tr>
+<td></td>
+<th aria-label="Monzo Free"><svg><title>Monzo Hot Coral card</title></svg></th>
+<th aria-label="Monzo Extra £3 a month"><svg><title>Monzo Extra card</title></svg></th>
+</tr></thead>
+<tbody>
+<tr>
+<th><a aria-label="Learn more about Instant Access Savings Pot">Instant Access Savings Pot</a></th>
+<td><span><a>Instant Access Savings Pot</a><span>2.75% AER (variable)</span></span></td>
+<td><span><a>Instant Access Savings Pot</a><span>3.00% AER (variable)</span></span></td>
+</tr>
+</tbody>
+</table>
+</main></body></html>
+"""
+
 
 def test_strips_script_style_nav_header_footer_from_body_text():
     content = extract_page_content(PAGE_WITH_MAIN, "https://example.com/business-banking")
@@ -136,6 +176,32 @@ def test_extracts_published_at_from_time_tag():
 def test_published_at_is_none_when_absent():
     content = extract_page_content(PAGE_WITH_MAIN, "https://example.com/business-banking")
     assert content["published_at"] is None
+
+
+def test_table_values_stay_attached_to_their_row_and_column_labels():
+    content = extract_page_content(PAGE_WITH_FEE_TABLE, "https://example.com/fees")
+
+    assert "Monzo is not my main bank — UK & EEA: 400 fee-free; Outside EEA: 200 fee-free" in content["body_text"]
+    assert "Monzo is my main bank — UK & EEA: Unlimited fee-free; Outside EEA: 200 fee-free" in content["body_text"]
+
+    # the flattened table shouldn't leave bare, unlabelled values floating
+    # around on their own line (the original get_text() bug this replaces)
+    assert "\n400 fee-free\n" not in content["body_text"]
+
+
+def test_table_header_prefers_aria_label_over_svg_only_visible_text():
+    content = extract_page_content(PAGE_WITH_COMPARISON_TABLE, "https://example.com/savings-isas")
+    assert "Monzo Free: 2.75% AER (variable)" in content["body_text"]
+    assert "Monzo Extra £3 a month: 3.00% AER (variable)" in content["body_text"]
+
+
+def test_table_strips_row_label_repeated_inside_value_cell():
+    content = extract_page_content(PAGE_WITH_COMPARISON_TABLE, "https://example.com/savings-isas")
+    # the raw cell text is "Instant Access Savings Pot2.75% AER (variable)"
+    # (row label glued to the mobile rate span) -- the label prefix must be
+    # stripped, not left concatenated onto the value
+    assert "Pot2.75%" not in content["body_text"]
+    assert "Instant Access Savings Pot — Monzo Free: 2.75% AER (variable)" in content["body_text"]
 
 
 def test_word_count_matches_body_text_word_count():
