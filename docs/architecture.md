@@ -59,11 +59,11 @@ The product/business-facing job: every question asked, every retrieval that succ
 
 Most public RAG demos stop at "ask a question, get an answer." Treating the query stream itself as a first-class analytics dataset — with a dbt layer, defined grain, and downstream dashboards — is what turns this from a chatbot demo into a product analytics portfolio piece. It's the same reason a real company would build something like this: not just to answer customers, but to learn what they're asking.
 
-## Phase 1–6 scope
+## Phase 1–7 scope
 
-Phases 1–6 implement **Data Ingestion**, **Content Processing**, and (skipping the deferred dbt/knowledge-graph phases — see the MVP scope note in `docs/roadmap.md`) the retrieval half of **Vector Retrieval**. Phase 1 produces a validated, categorised inventory of public Monzo URLs (`data/raw/monzo_urls.csv`); Phase 2 fetches the raw HTML for the MVP-flagged subset of that inventory (`data/raw/pages/`, tracked via `data/raw/pages_manifest.csv`); Phase 3 parses that raw HTML into clean, structured text (`data/processed/pages.parquet`); Phase 6 chunks that text and builds a local hybrid (vector + keyword) retrieval index (`data/processed/retrieval/`). No knowledge graph, LLM calls, or analytics are implemented yet — Phase 7 is what wires retrieval into an actual conversational assistant.
+Phases 1–7 implement **Data Ingestion**, **Content Processing**, **Vector Retrieval**, and the start of **LLM/RAG** and **Query Analytics** — skipping the deferred dbt/knowledge-graph phases (see the MVP scope note in `docs/roadmap.md`). Phase 1 produces a validated, categorised inventory of public Monzo URLs (`data/raw/monzo_urls.csv`); Phase 2 fetches the raw HTML for the MVP-flagged subset of that inventory (`data/raw/pages/`, tracked via `data/raw/pages_manifest.csv`); Phase 3 parses that raw HTML into clean, structured text (`data/processed/pages.parquet`); Phase 6 chunks that text and builds a local hybrid (vector + keyword) retrieval index (`data/processed/retrieval/`); Phase 7 wires that retrieval into a Streamlit chat app that calls Claude for a grounded answer, and logs every exchange to `data/analytics/query_log.db`. No knowledge graph or dbt modelling is implemented yet.
 
-## Ingestion + processing + retrieval pipeline
+## Ingestion + processing + retrieval + assistant pipeline
 
 ```text
 robots.txt → sitemap discovery (recursive) → extract URLs → normalise → dedupe
@@ -79,9 +79,13 @@ BeautifulSoup → strip nav/header/footer/script/cookie-banner boilerplate
 pages.parquet → pack lines into ~220-word chunks (line boundaries only)
 → embed each chunk locally (sentence-transformers) → build FAISS index
 → build BM25 keyword index → save index + chunk table                          (Phase 6)
+
+user question → hybrid search (Phase 6) → build grounded prompt from top-k
+chunks → Claude (Haiku 4.5) → answer + citations, or the fixed no-answer
+marker → log question + chunks + answer to SQLite                              (Phase 7)
 ```
 
-See `src/monzo_ai/ingestion/`, `src/monzo_ai/processing/`, and `src/monzo_ai/retrieval/` for the implementation:
+See `src/monzo_ai/ingestion/`, `src/monzo_ai/processing/`, `src/monzo_ai/retrieval/`, and `src/monzo_ai/assistant/` for the implementation:
 
 - `ingestion/sitemap.py` — robots.txt + sitemap(-index) fetching and recursive resolution; also exposes `fetch_robots_parser()`, reused by Phase 2 for per-page robots.txt checks.
 - `ingestion/filters.py` — URL normalisation, categorisation, and MVP-inclusion rules (all driven by `config/sources.yaml`).
@@ -91,4 +95,6 @@ See `src/monzo_ai/ingestion/`, `src/monzo_ai/processing/`, and `src/monzo_ai/ret
 - `retrieval/chunking.py` — Phase 6: packs Phase 3's line-structured body text into retrieval-sized chunks without ever splitting a line (so a table row stays attached to its own label).
 - `retrieval/index.py` — Phase 6: builds/saves/loads the FAISS vector index + rebuilds BM25 from the saved chunk table.
 - `retrieval/search.py` — Phase 6: hybrid search — fuses FAISS's vector ranking with BM25's keyword ranking via Reciprocal Rank Fusion.
+- `assistant/generate.py` — Phase 7: builds the grounded prompt from retrieved chunks and calls Claude; the system prompt enforces a fixed, exact marker sentence for "not enough information," so `had_answer` is a reliable boolean rather than a guess parsed from free text.
+- `assistant/query_log.py` — Phase 7 (Phase 8 groundwork): normalized SQLite logging of every question, its retrieved chunks, and the generated answer.
 - `utils/http.py` — shared retry/backoff HTTP helper used by both `sitemap.py` and `fetch_pages.py`, so rate-limiting behaviour stays consistent across the ingestion pipeline.

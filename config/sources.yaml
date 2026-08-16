@@ -40,6 +40,13 @@ retrieval:
   chunk_min_words: 40
   chunk_overlap_lines: 1
 
+assistant:
+  model: "claude-haiku-4-5"
+  max_tokens: 1024
+
+analytics:
+  query_log_path: "data/analytics/query_log.db"
+
 normalisation:
   strip_query_params:
     - "utm_source"

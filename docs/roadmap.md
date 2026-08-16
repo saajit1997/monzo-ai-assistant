@@ -52,17 +52,22 @@ Each phase is scoped to be buildable over a weekend. See `docs/architecture.md` 
 - **Approach**: chunks are packed from Phase 3's existing line-per-paragraph/line-per-table-row text up to ~220 words, splitting only at line boundaries (never mid-sentence, and — since Phase 3 already made every table row self-contained — never separating a value from its label). Embeddings are computed once with a local `sentence-transformers` model (`all-MiniLM-L6-v2`, no API key, no per-query cost, fully reproducible offline) into a FAISS flat index; BM25 (`rank_bm25`) supplies the keyword half. The two rankings are combined via Reciprocal Rank Fusion rather than a learned re-ranker, kept deliberately simple for the MVP.
 - **Status**: done. Live build: 909 pages → 1,774 chunks, ~3MB index, ~30s to build locally. `scripts/evaluate_retrieval.py` runs a hand-written 14-query set (spanning help/product/business/security/legal) against the real index: **13/14 (93%) hit-rate@5**. The one miss ("how much does Monzo Max cost per month") pulled several on-topic-but-wrong pages (T&Cs, fee-information) instead of the actual plan-comparison page — a plausible limitation of a small local embedding model on a comparison-style query, not a code bug; noted rather than chased further for MVP scope.
 
-## Phase 7 — RAG assistant (current)
+## Phase 7 — RAG assistant
 
 - **Objective**: Wire retrieval into an LLM-backed conversational assistant. (Originally also planned to draw on Phase 5's knowledge graph — deferred with Phase 5; retrieval-only is enough to prove the concept for the MVP.)
-- **Outputs**: `app/` FastAPI service exposing a chat endpoint.
+- **Outputs**: `app/streamlit_app.py` (interface choice made explicitly at this point — Streamlit over the originally-planned bare FastAPI endpoint, since the user already knows Streamlit and it gives a real chat UI in one file rather than an API plus a separate frontend); `src/monzo_ai/assistant/generate.py` (grounded prompt + Claude call); `src/monzo_ai/assistant/query_log.py` (SQLite logging, pulled forward from Phase 8 — see note below).
 - **Acceptance criteria**: Answers a benchmark set of questions with grounded citations back to source URLs.
+- **Model choice**: Claude Haiku 4.5 (`claude-haiku-4-5`) — explicitly chosen over Sonnet/Opus for cost, since these are grounded lookups over a handful of short retrieved chunks, not complex reasoning. Configurable in `config/sources.yaml` under `assistant:`.
+- **Grounding approach**: the system prompt instructs the model to answer *only* from the retrieved context, cite source URLs, and — critically — respond with one fixed, exact marker sentence when the context doesn't contain the answer. Checking for that literal string (rather than trying to infer "did it actually answer" from free-form text) is what makes `had_answer` a reliable signal for Phase 8/9's content-gap analytics, not a guess.
+- **Query logging pulled forward from Phase 8**: rather than building the chat app first and bolting on logging later, every exchange (question, retrieved chunks with rank/url/category/score, generated answer, model, latency, token counts, `had_answer`) is logged to `data/analytics/query_log.db` (SQLite, normalized: `queries` + `query_results` tables) from Phase 7's first commit. This is the project's stated differentiator per `docs/architecture.md` — the query stream itself is the analytics dataset — so it was built in from the start rather than retrofitted.
+- **Note on cost**: this is the first phase that costs money per use (Claude API calls) and needs the user's own `ANTHROPIC_API_KEY`. Every prior phase (1–6) is free and runs fully offline/local.
 
 ## Phase 8 — Query/event analytics
 
 - **Objective**: Log every query + retrieval outcome as a structured event; model it with dbt.
 - **Outputs**: Event schema, dbt models under `dbt/`, populated `data/analytics/`.
 - **Acceptance criteria**: Can answer "what are people asking about and where does retrieval fail" from the modelled data alone.
+- **Status**: event capture is already done — Phase 7 built the logging (`data/analytics/query_log.db`) in from the start rather than retrofitting it. What's left for this phase specifically is the dbt modelling layer on top of the raw event table.
 
 ## Phase 9 — Product analytics dashboard
 

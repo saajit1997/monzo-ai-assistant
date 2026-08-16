@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Monzo Retrieval Test</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #f7f7fa;
+    --panel: #ffffff;
+    --text: #16161a;
+    --muted: #6b6b76;
+    --border: #e4e4ea;
+    --accent: #ff4f40;
+    --accent-ink: #ffffff;
+    --code-bg: #f1f1f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #131318;
+      --panel: #1c1c24;
+      --text: #f0f0f3;
+      --muted: #9a9aa6;
+      --border: #2e2e38;
+      --accent: #ff6a5c;
+      --accent-ink: #16161a;
+      --code-bg: #26262f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 32px 20px 80px; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin: 0 0 4px; }
+  .disclaimer {
+    font-size: 0.78rem; color: var(--muted); background: var(--code-bg);
+    border-radius: 8px; padding: 8px 12px; margin: 16px 0 28px; line-height: 1.4;
+  }
+  form { display: flex; gap: 8px; margin-bottom: 28px; }
+  input[type="text"] {
+    flex: 1; padding: 12px 14px; font-size: 1rem; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--panel); color: var(--text);
+  }
+  input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button {
+    padding: 12px 20px; font-size: 1rem; font-weight: 600; border-radius: 10px;
+    border: none; background: var(--accent); color: var(--accent-ink); cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .status { color: var(--muted); font-size: 0.9rem; min-height: 1.4em; margin-bottom: 12px; }
+  .status.error { color: var(--accent); }
+  .examples { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 28px; }
+  .examples button {
+    background: var(--code-bg); color: var(--text); font-weight: 400; font-size: 0.82rem;
+    padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border);
+  }
+  .result {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px 18px; margin-bottom: 14px;
+  }
+  .result-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+  .result-title { font-weight: 600; font-size: 0.98rem; }
+  .result-score { color: var(--muted); font-size: 0.78rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .result-url { display: block; font-size: 0.8rem; color: var(--accent); text-decoration: none; margin-bottom: 8px; word-break: break-all; }
+  .result-url:hover { text-decoration: underline; }
+  .result-badge {
+    display: inline-block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em;
+    color: var(--muted); background: var(--code-bg); border-radius: 6px; padding: 2px 7px; margin-bottom: 8px;
+  }
+  .result-text { font-size: 0.88rem; line-height: 1.5; color: var(--text); white-space: pre-line; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Monzo Retrieval Test</h1>
+  <p class="subtitle">Independent portfolio project — not affiliated with Monzo Bank.</p>
+  <p class="disclaimer">
+    This queries the real Phase 6 hybrid (vector + BM25) retrieval index directly.
+    It shows the chunks retrieval finds — there is no LLM call here, no generated
+    answer, and nothing is fabricated. That's Phase 7.
+  </p>
+
+  <form id="search-form">
+    <input type="text" id="query" placeholder="Ask about Monzo's fees, accounts, security..." autofocus>
+    <button type="submit" id="submit-btn">Search</button>
+  </form>
+
+  <div class="examples" id="examples"></div>
+
+  <div class="status" id="status"></div>
+  <div id="results"></div>
+</div>
+
+<script>
+  const EXAMPLES = [
+    "what's the fee for withdrawing cash abroad",
+    "can I open a joint account with my partner",
+    "my card was stolen, what do I do",
+    "how much does Monzo Max cost per month",
+    "what is Monzo Flex",
+  ];
+
+  const examplesEl = document.getElementById("examples");
+  EXAMPLES.forEach((q) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = q;
+    btn.addEventListener("click", () => {
+      document.getElementById("query").value = q;
+      runSearch(q);
+    });
+    examplesEl.appendChild(btn);
+  });
+
+  const form = document.getElementById("search-form");
+  const input = document.getElementById("query");
+  const submitBtn = document.getElementById("submit-btn");
+  const statusEl = document.getElementById("status");
+  const resultsEl = document.getElementById("results");
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const q = input.value.trim();
+    if (q) runSearch(q);
+  });
+
+  async function runSearch(query) {
+    submitBtn.disabled = true;
+    statusEl.className = "status";
+    statusEl.textContent = "Searching...";
+    resultsEl.innerHTML = "";
+
+    try {
+      const resp = await fetch("/api/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, top_k: 5 }),
+      });
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        statusEl.className = "status error";
+        statusEl.textContent = data.error || `Search failed (${resp.status})`;
+        return;
+      }
+
+      if (!data.results.length) {
+        statusEl.textContent = "No results.";
+        return;
+      }
+
+      statusEl.textContent = `${data.results.length} result(s)`;
+      data.results.forEach((r) => resultsEl.appendChild(renderResult(r)));
+    } catch (err) {
+      statusEl.className = "status error";
+      statusEl.textContent = "Could not reach the local server. Is scripts/serve_search_ui.py running?";
+    } finally {
+      submitBtn.disabled = false;
+    }
+  }
+
+  function renderResult(r) {
+    const div = document.createElement("div");
+    div.className = "result";
+
+    const badge = document.createElement("span");
+    badge.className = "result-badge";
+    badge.textContent = r.category;
+    div.appendChild(badge);
+
+    const head = document.createElement("div");
+    head.className = "result-head";
+    const title = document.createElement("div");
+    title.className = "result-title";
+    title.textContent = r.title || "(untitled)";
+    const score = document.createElement("div");
+    score.className = "result-score";
+    score.textContent = `score ${r.score}`;
+    head.appendChild(title);
+    head.appendChild(score);
+    div.appendChild(head);
+
+    const url = document.createElement("a");
+    url.className = "result-url";
+    url.href = r.url;
+    url.target = "_blank";
+    url.rel = "noopener";
+    url.textContent = r.url;
+    div.appendChild(url);
+
+    const text = document.createElement("div");
+    text.className = "result-text";
+    text.textContent = r.text;
+    div.appendChild(text);
+
+    return div;
+  }
+</script>
+</body>
+</html>
