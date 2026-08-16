@@ -1,0 +1,9 @@
+# Colors pulled from real fetched Monzo pages (data/raw/pages/*.html) --
+# see the palette note in app/streamlit_app.py for how these were found.
+[theme]
+primaryColor = "#FF4F40"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F5F1EC"
+textColor = "#112231"
+font = "sans serif"
+baseRadius = "large"

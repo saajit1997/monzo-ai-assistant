@@ -43,6 +43,7 @@ retrieval:
 assistant:
   model: "claude-haiku-4-5"
   max_tokens: 1024
+  max_queries_per_session: 10
 
 analytics:
   query_log_path: "data/analytics/query_log.db"
