@@ -22,9 +22,9 @@ Full detail, including the deliberate split between the operational (answer-a-qu
 
 ## Current phase
 
-**Phase 3 — Content cleaning and modelling.** Phase 1 crawls Monzo's public sitemap(s) (via `robots.txt`), normalises and deduplicates the URLs, categorises them, and flags which ones belong in the MVP knowledge base (`data/raw/monzo_urls.csv`). Phase 2 fetches the raw HTML for every `include_in_mvp=True` URL, re-checking each one against `robots.txt` individually, and records a fetch manifest (`data/raw/pages_manifest.csv`: status code, content hash, fetch timestamp, error if any) so re-runs skip pages already fetched successfully instead of re-crawling the whole site. Phase 3 parses that raw HTML with BeautifulSoup into clean, structured text — title, headings, body text, word count — stripping nav/header/footer/cookie-banner boilerplate, and writes one row per page to `data/processed/pages.parquet`.
+**Phase 6 — Embeddings + hybrid retrieval.** Phases 1–3 built the content pipeline: sitemap → URL inventory (`data/raw/monzo_urls.csv`) → raw HTML (`data/raw/pages/`, manifest at `data/raw/pages_manifest.csv`) → clean structured text (`data/processed/pages.parquet`). Phases 4 (dbt over static content) and 5 (knowledge graph) are deferred — see the MVP scope note in `docs/roadmap.md` — in favour of going straight to retrieval, since that's the shortest path to a working, demonstrable assistant.
 
-No chatbot, RAG, embeddings, or knowledge graph exists yet.
+No chatbot, RAG, or embeddings exist yet.
 
 ## Future phases
 
@@ -32,10 +32,10 @@ No chatbot, RAG, embeddings, or knowledge graph exists yet.
 |---|---|
 | 1 | URL discovery |
 | 2 | Content ingestion |
-| 3 | Content cleaning and modelling *(current)* |
-| 4 | dbt analytics layer |
-| 5 | Knowledge graph |
-| 6 | Embeddings + hybrid retrieval |
+| 3 | Content cleaning and modelling |
+| 4 | dbt analytics layer *(deferred, not required for MVP)* |
+| 5 | Knowledge graph *(deferred, not required for MVP)* |
+| 6 | Embeddings + hybrid retrieval *(current)* |
 | 7 | RAG assistant |
 | 8 | Query/event analytics |
 | 9 | Product analytics dashboard |

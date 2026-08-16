@@ -4,6 +4,8 @@
 
 Each phase is scoped to be buildable over a weekend. See `docs/architecture.md` for how these fit together.
 
+**MVP scope note (added after Phase 3):** Phases 4 (dbt over static content) and 5 (knowledge graph) are deferred, not required for the MVP. Neither is on the critical path to the actual MVP hypothesis — a working RAG assistant that also captures query analytics. Phase 4 as originally scoped was explicitly "a warm-up for Phase 8"; the real dbt/analytics payoff is modelling the live query stream in Phase 8, once one exists, not page-count stats over content that won't change much. The leanest path to a working, demonstrable MVP is **Phase 6 → 7 → 8**. Phases 4/5 can be revisited afterward as portfolio depth if there's time.
+
 ## Phase 1 — URL discovery
 
 - **Objective**: Discover every public URL on monzo.com via sitemap(s), respecting robots.txt, and produce a categorised, MVP-flagged inventory.
@@ -30,19 +32,19 @@ Each phase is scoped to be buildable over a weekend. See `docs/architecture.md` 
 - **Table bug found and fixed**: plain `get_text()` flattened `<table>` elements (fee schedules, terms-and-conditions tables) into a bare sequence of cell values with no row/column label attached — a real correctness risk once Phase 6 chunks this text, since a chunk boundary could separate a fee amount from the plan/region it applies to. Tables are now rendered as explicit `"row — column: value"` text. Also fixed a related case on `/savings-isas`'s comparison tables (SVG-icon-only headers, row labels duplicated inside value cells for the mobile layout).
 - **Known limitation, deliberately deferred to Phase 6**: `get_text(separator="\n")` fragments deeply-nested UI components (plan-card buttons, step-by-step instructions) into many tiny disconnected lines — e.g. `"Get"`, `"Tap"`, `"Learn more"` each on their own line, repeated per plan/step. Affects ~51/909 pages (>15% duplicate-line ratio), worse on pricing-plan and instructional pages (`/current-account/plans`, `/help/.../monzo-card-lost-damaged-stolen`). Unlike the table bug, this doesn't attach wrong labels to values — it's noise, not incorrect information — so it was left as-is rather than redesigning the whole line-break strategy. Revisit if Phase 6's chunking doesn't naturally absorb it (a chunk window spanning several lines should smooth over most of this) or if it visibly hurts retrieval quality.
 
-## Phase 4 — dbt analytics layer
+## Phase 4 — dbt analytics layer *(deferred, not required for MVP)*
 
 - **Objective**: Stand up a dbt project over the processed content to model page/category-level analytics (content volume by category, freshness, etc.) as a warm-up for the Phase 8 query-analytics dbt models.
 - **Outputs**: `dbt/` project with staging + mart models.
 - **Acceptance criteria**: `dbt run` + `dbt test` succeed against a local DuckDB (or similar) target.
 
-## Phase 5 — Knowledge graph
+## Phase 5 — Knowledge graph *(deferred, not required for MVP)*
 
 - **Objective**: Extract entities (products, fees, features) and relationships from processed content into a graph.
 - **Outputs**: Graph store populated under `src/monzo_ai/knowledge_graph/`.
 - **Acceptance criteria**: Can answer simple structured queries (e.g. "which accounts have no monthly fee") directly from the graph.
 
-## Phase 6 — Embeddings + hybrid retrieval
+## Phase 6 — Embeddings + hybrid retrieval (current)
 
 - **Objective**: Chunk and embed processed content; combine vector similarity with keyword/BM25 search.
 - **Outputs**: Vector store populated under `src/monzo_ai/retrieval/`.
@@ -50,7 +52,7 @@ Each phase is scoped to be buildable over a weekend. See `docs/architecture.md` 
 
 ## Phase 7 — RAG assistant
 
-- **Objective**: Wire retrieval + knowledge graph facts into an LLM-backed conversational assistant.
+- **Objective**: Wire retrieval into an LLM-backed conversational assistant. (Originally also planned to draw on Phase 5's knowledge graph — deferred with Phase 5; retrieval-only is enough to prove the concept for the MVP.)
 - **Outputs**: `app/` FastAPI service exposing a chat endpoint.
 - **Acceptance criteria**: Answers a benchmark set of questions with grounded citations back to source URLs.
 
