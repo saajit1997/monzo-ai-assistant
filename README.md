@@ -38,7 +38,7 @@ Full detail, including the deliberate split between the operational (answer-a-qu
 | 7 | Product analytics dashboard |
 | 8 | Evaluation and observability |
 
-See [`docs/roadmap.md`](docs/roadmap.md) for objectives/outputs/acceptance criteria per phase.
+See [`docs/roadmap.md`](docs/roadmap.md) for objectives/outputs/acceptance criteria per phase, and [`docs/deployment.md`](docs/deployment.md) for how the live demo is deployed and redeployed.
 
 ## Data policy
 
