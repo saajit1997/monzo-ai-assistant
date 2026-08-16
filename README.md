@@ -3,9 +3,8 @@ title: Monzo AI Knowledge Assistant
 emoji: 💬
 colorFrom: red
 colorTo: gray
-sdk: streamlit
-sdk_version: "1.61.1"
-app_file: app/streamlit_app.py
+sdk: docker
+app_port: 8501
 pinned: false
 license: mit
 ---
