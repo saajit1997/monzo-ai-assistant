@@ -1,3 +1,15 @@
+---
+title: Monzo AI Knowledge Assistant
+emoji: 💬
+colorFrom: red
+colorTo: gray
+sdk: streamlit
+sdk_version: "1.61.1"
+app_file: app/streamlit_app.py
+pinned: false
+license: mit
+---
+
 # Monzo AI Knowledge Assistant
 
 > **Disclaimer:** This is an independent portfolio project and is not affiliated with, endorsed by, or sponsored by Monzo Bank.
