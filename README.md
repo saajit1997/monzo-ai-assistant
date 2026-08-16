@@ -1,0 +1,92 @@
+# Monzo AI Knowledge Assistant
+
+> **Disclaimer:** This is an independent portfolio project and is not affiliated with, endorsed by, or sponsored by Monzo Bank.
+
+## Problem
+
+Banking websites spread customer information across product pages, FAQs, help docs, and blog posts, with no single place to ask a question and get a grounded answer. Customers manually hunt across pages to piece together things like "does this account support joint ownership" or "what happens if I lose my card abroad."
+
+## MVP hypothesis
+
+A grounded conversational interface over a bank's public content could make that information easier to discover — and, as a byproduct of every question asked, generate structured analytics about what customers actually want to know (product-intent signals, content gaps) that a support or product team could act on.
+
+## Long-term architecture
+
+```text
+Monzo Public Website → Data Ingestion → Content Processing → dbt Transformation
+    → Knowledge Graph → Vector Retrieval → LLM/RAG → AI Assistant
+    → Query Analytics → Product Insights
+```
+
+Full detail, including the deliberate split between the operational (answer-a-question) path and the analytics (learn-from-questions) path, is in [`docs/architecture.md`](docs/architecture.md).
+
+## Current phase
+
+**Phase 2 — Content ingestion.** Phase 1 crawls Monzo's public sitemap(s) (via `robots.txt`), normalises and deduplicates the URLs, categorises them, and flags which ones belong in the MVP knowledge base (`data/raw/monzo_urls.csv`). Phase 2 fetches the raw HTML for every `include_in_mvp=True` URL, re-checking each one against `robots.txt` individually, and records a fetch manifest (`data/raw/pages_manifest.csv`: status code, content hash, fetch timestamp, error if any) so re-runs skip pages already fetched successfully instead of re-crawling the whole site.
+
+No chatbot, RAG, embeddings, or knowledge graph exists yet.
+
+## Future phases
+
+| Phase | Focus |
+|---|---|
+| 1 | URL discovery |
+| 2 | Content ingestion *(current)* |
+| 3 | Content cleaning and modelling |
+| 4 | dbt analytics layer |
+| 5 | Knowledge graph |
+| 6 | Embeddings + hybrid retrieval |
+| 7 | RAG assistant |
+| 8 | Query/event analytics |
+| 9 | Product analytics dashboard |
+| 10 | Evaluation and observability |
+
+See [`docs/roadmap.md`](docs/roadmap.md) for objectives/outputs/acceptance criteria per phase.
+
+## Data policy
+
+- `data/raw/monzo_urls.csv` **is committed to git.** It's a small (~1–2k row), useful artifact that documents Phase 1's output for reviewers — nothing sensitive, just public URLs and metadata derived from them.
+- `data/raw/pages_manifest.csv` **is committed to git.** Same reasoning as above — one small, useful row per fetched URL (status code, content hash, timestamp), not the content itself.
+- `data/raw/pages/*.html` (the actual scraped HTML bodies) is **not committed** — regenerable by re-running `scripts/fetch_monzo_pages.py`, and bulky enough (~1k files) that it doesn't belong in git history.
+- `data/processed/` and `data/analytics/` are **not committed** (`.gitignore`'d, `.gitkeep` aside). Future phases will generate much larger scraped/derived content there that doesn't belong in git history.
+
+## Installation
+
+```bash
+python -m venv .venv
+source .venv/bin/activate   # macOS/Linux
+.venv\Scripts\activate      # Windows
+pip install -r requirements.txt
+```
+
+(Equivalently: `pip install -e .` — `pyproject.toml` is the source of truth for dependencies; `requirements.txt` is generated from it for reviewers who'd rather not do an editable install.)
+
+## Running Phase 1
+
+```bash
+python scripts/discover_monzo_urls.py
+pytest
+```
+
+Optional flags on the discovery script:
+
+- `--limit N` — cap the number of URLs processed, for fast local iteration.
+- `--output PATH` — override the output CSV path.
+
+## Running Phase 2
+
+```bash
+python scripts/fetch_monzo_pages.py
+```
+
+Fetches raw HTML for every `include_in_mvp=True` URL from `data/raw/monzo_urls.csv` into `data/raw/pages/`, writing a fetch manifest to `data/raw/pages_manifest.csv`. Re-running skips URLs that were already fetched successfully — pass `--force` to re-fetch everything anyway.
+
+Optional flags:
+
+- `--limit N` — cap the number of URLs fetched, for fast local iteration.
+- `--force` — re-fetch URLs even if already successfully cached.
+- `--input / --output-dir / --manifest PATH` — override the default paths.
+
+## Responsible crawling
+
+This project only reads publicly listed sitemap URLs and respects `robots.txt` (`Sitemap:` directives, `Disallow` rules, `Crawl-delay`). It sends an identifying `User-Agent`, rate-limits requests, and never touches customer/personal data, authentication, or non-public endpoints.

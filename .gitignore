@@ -1,0 +1,26 @@
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+.env
+.vscode/
+.idea/
+.DS_Store
+*.egg-info/
+build/
+dist/
+.mypy_cache/
+.ruff_cache/
+
+# Phase 2+ generated artifacts — not Phase 1's committed CSV
+data/processed/*
+!data/processed/.gitkeep
+data/analytics/*
+!data/analytics/.gitkeep
+
+# Phase 2: raw HTML dumps are bulky derived content, regenerable by
+# re-running scripts/fetch_monzo_pages.py — only the small manifest CSV
+# (data/raw/pages_manifest.csv) documenting the run is committed.
+data/raw/pages/

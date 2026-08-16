@@ -1,0 +1,156 @@
+# Configuration for Phase 1: Monzo public URL discovery.
+# Edit this file to tune crawl behaviour, categorisation, and MVP inclusion
+# rules without touching code (see src/monzo_ai/ingestion/).
+
+monzo:
+  base_url: "https://monzo.com"
+  robots_url: "https://monzo.com/robots.txt"
+  # Used only if robots.txt lists no Sitemap: directives.
+  fallback_sitemap_url: "https://monzo.com/sitemap.xml"
+  output_path: "data/raw/monzo_urls.csv"
+  # Domain (and subdomains) allowed to survive filtering. A sitemap could in
+  # principle reference third-party or unrelated hosts; anything not matching
+  # one of these is dropped during normalisation.
+  allowed_domains:
+    - "monzo.com"
+
+crawler:
+  user_agent: "MonzoAIAssistant-PortfolioBot/0.1 (+https://github.com/saajit1997/monzo-ai-assistant; educational/non-commercial portfolio project)"
+  request_timeout_seconds: 10
+  request_delay_seconds: 0.4
+  max_sitemap_recursion_depth: 5
+  max_retries: 3
+  retry_backoff_seconds: 1.0
+
+content_fetch:
+  input_path: "data/raw/monzo_urls.csv"
+  output_dir: "data/raw/pages"
+  manifest_path: "data/raw/pages_manifest.csv"
+
+normalisation:
+  strip_query_params:
+    - "utm_source"
+    - "utm_medium"
+    - "utm_campaign"
+    - "utm_content"
+    - "utm_term"
+    - "gclid"
+    - "fbclid"
+    - "ref"
+    - "mc_cid"
+    - "mc_eid"
+
+# Ordered path-pattern -> category table. First match wins (patterns are
+# checked in the order listed here, top to bottom). Anything that matches
+# none of these falls into "other".
+#
+# Ordering rationale, tuned against a real run against monzo.com's live
+# sitemap (2,512 URLs, see docs/roadmap.md Phase 1 notes):
+#   - "help" and "blog" are checked first because they're the largest,
+#     clearly-delineated sections, and free-form blog slugs (e.g.
+#     "/blog/plans-cancelled-because-of-coronavirus...") can otherwise
+#     collide with short generic patterns like "/plans" or "/security"
+#     later in the table.
+#   - "business" is checked before the generic "product" patterns so a page
+#     like /business-banking/current-account is categorised by its section,
+#     not by an incidental product-pattern substring match.
+#   - "product" is checked before "pricing" for the same reason
+#     (/current-account/pricing should be "product", not "pricing").
+#   - "legal" is checked before "pricing" too: paths like
+#     /legal/plans/fee-information otherwise get caught by the "/plans"
+#     pricing pattern instead of staying with their /legal/ siblings.
+categories:
+  help:
+    - "/help/"
+  blog:
+    - "/blog"
+    - "/i-am-not-a-robot"
+  business:
+    - "/business"
+  legal:
+    - "/legal"
+  product:
+    - "/current-account"
+    # NOTE: kept with a trailing slash deliberately — the bare pattern
+    # "/joint-account" also matches "/joint-accountability" (Monzo's
+    # diversity & inclusion report, not a product page), which was a real
+    # false positive observed in a live run.
+    - "/joint-account/"
+    - "/savings"
+    - "/pots"
+    - "/features"
+    - "/flex"
+    - "/credit-builder"
+    - "/overdraft"
+    - "/loans"
+    - "/travel"
+    - "/kids-account"
+    - "/16-17-account"
+    - "/investments"
+  security:
+    - "/security"
+    - "/fraud"
+    - "/scams"
+  pricing:
+    - "/pricing"
+    - "/plans"
+  careers:
+    - "/careers"
+  corporate:
+    - "/about"
+    - "/press/"
+    - "/investors/"
+    - "/annual-report"
+    - "/accessibility"
+
+# Non-HTML / asset extensions are always excluded from the MVP regardless of
+# category (see also "Always exclude" note below).
+excluded_extensions:
+  - ".css"
+  - ".js"
+  - ".png"
+  - ".jpg"
+  - ".jpeg"
+  - ".svg"
+  - ".gif"
+  - ".webp"
+  - ".ico"
+  - ".pdf"
+  - ".xml"
+  - ".json"
+
+# Path substrings that are always excluded from the MVP regardless of
+# category — includes paths Monzo's own robots.txt disallows (kept out of
+# the inventory entirely rather than left for a future crawler to trip over)
+# plus a few low-value sections identified from a manual look at the sitemap.
+excluded_path_patterns:
+  - "/press/"
+  - "/investors/"
+  - "/careers/"
+  - "/-deeplinks/"
+  - "/-staging-referral/"
+  - "/blog/authors/"
+  - "/docs/"
+  - "/install/"
+  - "/legal/files/"
+  - "/pay/r/"
+  - "/referral/"
+
+mvp_include_categories:
+  - "help"
+  - "product"
+  - "pricing"
+  - "security"
+  - "business"
+
+# For the "legal" category, only include a URL in the MVP if its path
+# contains one of these keywords (customer-facing terms/FAQs/fee info), not
+# internal policy dumps (e.g. /legal/tax-strategy, /legal/*/privacy-notice
+# are deliberately excluded). Tuned against a real run: Monzo's actual
+# summary-box pages are named e.g. "savings-summary", not "summary-box".
+legal_mvp_keywords:
+  - "faq"
+  - "terms"
+  - "summary"
+  - "fee"
+  - "your-agreement"
